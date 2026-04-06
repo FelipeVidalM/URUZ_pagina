@@ -4,7 +4,10 @@
 
 export const setupBooking = (initIcons) => {
     const timeSlotsContainer = document.getElementById('time-slots-container');
-    const dayBtns = document.querySelectorAll('.day-btn');
+    const daysSelector = document.getElementById('days-selector');
+    const currentMonthDisplay = document.getElementById('current-month-display');
+    const btnPrevWeek = document.getElementById('btn-prev-week');
+    const btnNextWeek = document.getElementById('btn-next-week');
     const svcBtns = document.querySelectorAll('.svc-btn');
     const ivBtns = document.querySelectorAll('.iv-btn');
     const ivTypeSelector = document.getElementById('iv-type-selector');
@@ -13,9 +16,21 @@ export const setupBooking = (initIcons) => {
     const bookingSummary = document.getElementById('booking-summary');
     const summaryDay = document.getElementById('summary-day');
     const summaryTime = document.getElementById('summary-time');
-    const btnGcal = document.getElementById('btn-gcal');
-    const btnIcs = document.getElementById('btn-ics');
-    const linkSueroterapia = document.getElementById('link-sueroterapia');
+    
+    // Form summary elements
+    const formSummaryService = document.getElementById('form-summary-service');
+    const formSummaryProvider = document.getElementById('form-summary-provider');
+    const formSummaryDate = document.getElementById('form-summary-date');
+    const formSummaryTime = document.getElementById('form-summary-time');
+    
+    // New Form elements
+    const bookingContainer = document.querySelector('.booking-container');
+    const btnShowForm = document.getElementById('btn-show-form');
+    const bookingFormContainer = document.getElementById('booking-form-container');
+    const bookingPatientForm = document.getElementById('booking-patient-form');
+    const btnBackToSlots = document.getElementById('btn-back-to-slots');
+    const bookingSuccess = document.getElementById('booking-success');
+    const btnResetBooking = document.getElementById('btn-reset-booking');
 
     if (!timeSlotsContainer) return;
 
@@ -24,9 +39,11 @@ export const setupBooking = (initIcons) => {
     let selectedIvType = 'Vitalidad';
     let selectedDoctor = 'silva';
     let selectedDoctorName = "Dr. Alejandro Silva";
-    let selectedDay = 'Lunes';
+    let selectedDate = null; // Full date object
     let selectedTime = null;
     let slotDuration = 45;
+    let calendarStartDate = new Date(); // Tracks current view start
+    calendarStartDate.setHours(0,0,0,0);
 
     const doctorAvailability = {
         silva: ['Lunes', 'Miércoles', 'Viernes'],
@@ -34,6 +51,21 @@ export const setupBooking = (initIcons) => {
         ruiz: ['Lunes', 'Martes', 'Miércoles'],
         vargas: ['Jueves', 'Viernes', 'Sábado'],
         any: ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+    };
+
+    const getDayName = (date) => {
+        const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+        return days[date.getDay()];
+    };
+
+    const formatMonthYear = (date) => {
+        const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+        return `${months[date.getMonth()]} ${date.getFullYear()}`;
+    };
+
+    const formatFullDate = (date) => {
+        const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+        return `${getDayName(date)}, ${date.getDate()} de ${months[date.getMonth()]}`;
     };
 
     const formatTime = (totalMinutes) => {
@@ -52,13 +84,89 @@ export const setupBooking = (initIcons) => {
         return slots;
     };
 
-    const isDayAllowed = (dayText) => {
-        if(selectedService === 'suero') return true;
-        return doctorAvailability[selectedDoctor].includes(dayText);
+    const isDayAllowed = (date) => {
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        if(date < today) return false; // No past dates
+        if(selectedService === 'suero') return date.getDay() !== 0; // No Sundays for IV
+        const dayName = getDayName(date);
+        return doctorAvailability[selectedDoctor].includes(dayName);
     };
+
+    const renderDays = () => {
+        daysSelector.innerHTML = '';
+        currentMonthDisplay.textContent = formatMonthYear(calendarStartDate);
+
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        
+        // Disable Prev button if we are at today's week
+        if(btnPrevWeek) btnPrevWeek.disabled = (calendarStartDate <= today);
+
+        let daysAdded = 0;
+        let currentIterDate = new Date(calendarStartDate);
+
+        // Show 7 days range from calendarStartDate
+        for(let i = 0; i < 7; i++) {
+            const date = new Date(currentIterDate);
+            const btn = document.createElement('button');
+            btn.className = 'day-btn';
+            
+            const allowed = isDayAllowed(date);
+            if(!allowed) {
+                btn.classList.add('disabled');
+                btn.disabled = true;
+            }
+
+            if(selectedDate && selectedDate.toDateString() === date.toDateString()) btn.classList.add('active');
+            
+            btn.innerHTML = `<span>${getDayName(date).substring(0,3)}</span><strong>${date.getDate()}</strong>`;
+            
+            if(allowed) {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.day-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    selectedDate = date;
+                    selectedTime = null;
+                    renderSlots();
+                    updateSummary();
+                });
+            }
+
+            daysSelector.appendChild(btn);
+            currentIterDate.setDate(currentIterDate.getDate() + 1);
+        }
+    };
+
+    // Navigation logic
+    if(btnNextWeek) {
+        btnNextWeek.addEventListener('click', () => {
+            calendarStartDate.setDate(calendarStartDate.getDate() + 7);
+            renderDays();
+        });
+    }
+
+    if(btnPrevWeek) {
+        btnPrevWeek.addEventListener('click', () => {
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            const newStart = new Date(calendarStartDate);
+            newStart.setDate(newStart.getDate() - 7);
+            if(newStart >= today) {
+                calendarStartDate = newStart;
+            } else {
+                calendarStartDate = today;
+            }
+            renderDays();
+        });
+    }
 
     const renderSlots = () => {
         timeSlotsContainer.innerHTML = '';
+        if(!selectedDate) {
+            timeSlotsContainer.innerHTML = '<div class="no-selection-msg">Selecciona un día para ver disponibilidad.</div>';
+            return;
+        }
         const slots = generateSlots();
         slots.forEach(slot => {
             const div = document.createElement('div');
@@ -76,14 +184,13 @@ export const setupBooking = (initIcons) => {
     };
 
     const updateSummary = () => {
-        if(selectedDay && selectedTime) {
-            summaryDay.textContent = selectedDay;
+        if(selectedDate && selectedTime) {
+            summaryDay.textContent = formatFullDate(selectedDate);
             summaryTime.textContent = selectedTime.start;
             bookingSummary.style.display = 'block';
 
-            const targetDate = getNextDateForDayName(selectedDay);
-            const startISO = formatDateForCalendar(targetDate, selectedTime.startMins);
-            const endISO = formatDateForCalendar(targetDate, selectedTime.endMins);
+            const startISO = formatDateForCalendar(selectedDate, selectedTime.startMins);
+            const endISO = formatDateForCalendar(selectedDate, selectedTime.endMins);
             
             let eventTitle = `Consulta de Bienestar con ${selectedDoctorName}`;
             let eventDesc = `Reserva de consulta integrativa (45 min) con el/la ${selectedDoctorName}.`;
@@ -95,52 +202,95 @@ export const setupBooking = (initIcons) => {
                 locationStr = "URUZ Sala de Sueros";
             }
             
-            btnGcal.href = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(eventTitle)}&dates=${startISO}/${endISO}&details=${encodeURIComponent(eventDesc)}&location=${encodeURIComponent(locationStr)}`;
-
-            btnIcs.onclick = () => {
-                const icsContent = `BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nDTSTART:${startISO}\nDTEND:${endISO}\nSUMMARY:${eventTitle}\nDESCRIPTION:${eventDesc}\nLOCATION:${locationStr}\nEND:VEVENT\nEND:VCALENDAR`;
-                const file = new File([icsContent], "cita_uruz.ics", {type: "text/calendar;charset=utf-8"});
-                const url = URL.createObjectURL(file);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = "cita_uruz.ics";
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-            };
-            
             if (initIcons) initIcons();
         } else {
             bookingSummary.style.display = 'none';
         }
     };
 
-    const validateDaySelectionAndRender = () => {
-        dayBtns.forEach(btn => {
-            const d = btn.getAttribute('data-day');
-            btn.disabled = !isDayAllowed(d);
-            if(btn.disabled) btn.classList.remove('active');
-        });
+    const showForm = () => {
+        // Update Form Header Summary
+        if(formSummaryService) formSummaryService.textContent = selectedService === 'suero' ? `Sueroterapia (${selectedIvType})` : "Consulta de Bienestar";
+        if(formSummaryProvider) formSummaryProvider.textContent = selectedService === 'suero' ? "Sala de Sueros" : selectedDoctorName;
+        if(formSummaryDate) formSummaryDate.textContent = formatFullDate(selectedDate);
+        if(formSummaryTime) formSummaryTime.textContent = selectedTime ? selectedTime.start : "--:--";
 
-        if(!isDayAllowed(selectedDay)) {
-            const firstValidBtn = Array.from(dayBtns).find(b => !b.disabled);
-            if(firstValidBtn) {
-                dayBtns.forEach(b => b.classList.remove('active'));
-                firstValidBtn.classList.add('active');
-                selectedDay = firstValidBtn.getAttribute('data-day');
-                selectedTime = null;
-            }
-        }
-        renderSlots();
-        updateSummary();
+        // Hide calendar elements
+        document.querySelector('.service-selector').style.display = 'none';
+        document.querySelector('.doctor-selector').style.display = 'none';
+        document.querySelector('.iv-type-selector').style.display = 'none';
+        document.querySelector('.booking-calendar').style.display = 'none';
+        bookingSummary.style.display = 'none';
+        
+        // Show form
+        bookingFormContainer.style.display = 'block';
     };
+
+    const hideForm = () => {
+        document.querySelector('.service-selector').style.display = 'flex';
+        if(selectedService === 'consulta') {
+            document.querySelector('.doctor-selector').style.display = 'block';
+        } else {
+            document.querySelector('.iv-type-selector').style.display = 'block';
+        }
+        document.querySelector('.booking-calendar').style.display = 'block';
+        bookingSummary.style.display = 'block';
+        bookingFormContainer.style.display = 'none';
+    };
+
+    const resetBooking = () => {
+        bookingSuccess.style.display = 'none';
+        selectedTime = null;
+        selectedDate = null;
+        calendarStartDate = new Date();
+        calendarStartDate.setHours(0,0,0,0);
+        bookingPatientForm.reset();
+        hideForm();
+        renderDays();
+        renderSlots();
+    };
+
+    // Event Listeners for New Flow
+    if(btnShowForm) btnShowForm.addEventListener('click', showForm);
+    if(btnBackToSlots) btnBackToSlots.addEventListener('click', hideForm);
+    if(btnResetBooking) btnResetBooking.addEventListener('click', resetBooking);
+
+    if(bookingPatientForm) {
+        bookingPatientForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            // Gather form data
+            const formData = {
+                firstName: document.getElementById('p-firstname').value,
+                lastName: document.getElementById('p-lastname').value,
+                age: document.getElementById('p-age').value,
+                gender: document.getElementById('p-gender').value,
+                phone: document.getElementById('p-phone').value,
+                email: document.getElementById('p-email').value,
+                notes: document.getElementById('p-notes').value,
+                service: selectedService,
+                doctor: selectedDoctorName,
+                date: selectedDate.toISOString().split('T')[0],
+                day: formatFullDate(selectedDate),
+                time: selectedTime.start,
+                ivType: selectedService === 'suero' ? selectedIvType : null
+            };
+
+            console.log("Simulating reservation sending...", formData);
+            
+            // Show Success
+            bookingFormContainer.style.display = 'none';
+            bookingSuccess.style.display = 'block';
+            if (initIcons) initIcons();
+        });
+    }
 
     // Event Listeners
     svcBtns.forEach(btn => {
         btn.addEventListener('click', (e) => {
             svcBtns.forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-            selectedService = e.target.getAttribute('data-svc');
+            e.currentTarget.classList.add('active');
+            selectedService = e.currentTarget.getAttribute('data-svc');
             if(selectedService === 'suero') {
                 if(ivTypeSelector) ivTypeSelector.style.display = 'block';
                 if(doctorSelector) doctorSelector.style.display = 'none';
@@ -151,37 +301,37 @@ export const setupBooking = (initIcons) => {
                 slotDuration = 45;
             }
             selectedTime = null;
-            validateDaySelectionAndRender();
+            selectedDate = null; 
+            calendarStartDate = new Date();
+            calendarStartDate.setHours(0,0,0,0);
+            renderDays();
+            renderSlots();
+            updateSummary();
         });
     });
 
     docBtns.forEach(btn => {
         btn.addEventListener('click', (e) => {
             docBtns.forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-            selectedDoctor = e.target.getAttribute('data-doc');
+            e.currentTarget.classList.add('active');
+            selectedDoctor = e.currentTarget.getAttribute('data-doc');
             const names = { silva: "Dr. Alejandro Silva", mazo: "Dra. Carolina Mazo", ruiz: "Dr. Javier Ruiz", vargas: "Lic. Sofía Vargas", any: "Especialista URUZ" };
             selectedDoctorName = names[selectedDoctor] || "Especialista";
-            validateDaySelectionAndRender();
+            selectedDate = null;
+            selectedTime = null;
+            calendarStartDate = new Date();
+            calendarStartDate.setHours(0,0,0,0);
+            renderDays();
+            renderSlots();
+            updateSummary();
         });
     });
 
     ivBtns.forEach(btn => {
         btn.addEventListener('click', (e) => {
             ivBtns.forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-            selectedIvType = e.target.getAttribute('data-iv');
-            updateSummary();
-        });
-    });
-
-    dayBtns.forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            dayBtns.forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-            selectedDay = e.target.getAttribute('data-day');
-            selectedTime = null;
-            renderSlots();
+            e.currentTarget.classList.add('active');
+            selectedIvType = e.currentTarget.getAttribute('data-iv');
             updateSummary();
         });
     });
@@ -190,35 +340,23 @@ export const setupBooking = (initIcons) => {
     window.selectDoctor = (docId) => {
         const consultaBtn = document.querySelector('.svc-btn[data-svc="consulta"]');
         if(consultaBtn) consultaBtn.click();
+        
         const specificDocBtn = document.querySelector(`.doc-btn[data-doc="${docId}"]`);
         if(specificDocBtn) specificDocBtn.click();
+        
         const bookingSection = document.getElementById('booking');
-        if(bookingSection) bookingSection.scrollIntoView({behavior: 'smooth'});
+        if(bookingSection) {
+            bookingSection.scrollIntoView({behavior: 'smooth'});
+        }
     };
 
-    if(linkSueroterapia) {
-        linkSueroterapia.addEventListener('click', () => {
-            const sueroBtn = document.querySelector('.svc-btn[data-svc="suero"]');
-            if(sueroBtn) sueroBtn.click();
-        });
-    }
-
-    validateDaySelectionAndRender();
-};
-
-const getNextDateForDayName = (dayName) => {
-    const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-    const targetDayIdx = days.indexOf(dayName);
-    const now = new Date();
-    const currentDayIdx = now.getDay();
-    let diff = targetDayIdx - currentDayIdx;
-    if (diff <= 0) diff += 7;
-    const nextDate = new Date(now);
-    nextDate.setDate(now.getDate() + diff);
-    return nextDate;
+    // Initial Render
+    renderDays();
+    renderSlots();
 };
 
 const formatDateForCalendar = (date, mins) => {
+    if(!date) return "";
     const d = new Date(date);
     d.setHours(Math.floor(mins / 60), mins % 60, 0, 0);
     return d.toISOString().replace(/-|:|\.\d\d\d/g, "");

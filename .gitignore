@@ -5,3 +5,6 @@ dist/
 *.log
 .vscode/
 .gemini/
+
+# Video de grabación temporal
+Grabación 2026-04-01 120505.mp4

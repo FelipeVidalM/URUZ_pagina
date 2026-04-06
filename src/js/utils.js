@@ -1,7 +1,7 @@
+import feather from 'feather-icons';
+
 export const initIcons = () => {
-    if (window.feather) {
-        window.feather.replace();
-    }
+    feather.replace();
 };
 
 export const setupStickyHeader = () => {

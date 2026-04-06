@@ -23,7 +23,7 @@
   --transition-slow: 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
   
   /* Layout */
-  --max-width: 1200px;
+  --max-width: 1440px;
   --header-height: 80px;
 }
 
@@ -39,6 +39,12 @@
 html {
   scroll-behavior: smooth;
   font-size: 16px;
+}
+
+@media (min-width: 2000px) {
+  html {
+    font-size: 18px; /* Escala el texto en pantallas 4K/Ultra-wide */
+  }
 }
 
 body {
@@ -191,3 +197,314 @@ img {
 
 .delay-1 { animation-delay: 0.2s; }
 .delay-2 { animation-delay: 0.4s; }
+
+/* ---------------------------------------------------
+   BOOKING SYSTEM
+--------------------------------------------------- */
+.booking-container {
+  max-width: 900px;
+  margin: 0 auto;
+  background: var(--pure-white);
+  padding: 3rem;
+  border-radius: 20px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.05);
+}
+
+.service-selector, .iv-types, .doc-types {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 2rem;
+}
+
+.svc-btn, .iv-btn, .doc-btn, .day-btn {
+  padding: 0.8rem 1.5rem;
+  border-radius: 12px;
+  border: 1px solid var(--warm-sand);
+  background: var(--white);
+  font-family: var(--font-heading);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding: 0 0.5rem;
+}
+
+#current-month-display {
+  font-size: 1.25rem;
+  font-family: var(--font-heading);
+  color: var(--charcoal);
+  margin: 0;
+}
+
+.calendar-nav {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.nav-btn {
+  background: var(--white);
+  border: 1px solid var(--warm-sand);
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  color: var(--charcoal);
+}
+
+.nav-btn:hover:not(:disabled) {
+  background: var(--sage-light);
+  border-color: var(--sage-green);
+}
+
+.nav-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.nav-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.days-selector {
+  display: flex;
+  gap: 0.8rem;
+  overflow-x: auto;
+  padding: 0.5rem 0 1.5rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--sage-light) transparent;
+}
+
+.day-btn.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: var(--warm-light);
+}
+
+.day-btn.disabled strong, 
+.day-btn.disabled span {
+  color: var(--charcoal-light);
+}
+
+.days-selector::-webkit-scrollbar {
+  height: 6px;
+}
+
+.days-selector::-webkit-scrollbar-thumb {
+  background: var(--sage-light);
+  border-radius: 10px;
+}
+
+.day-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 80px;
+  padding: 1rem 0.5rem;
+  background: var(--white);
+  border: 1px solid var(--warm-sand);
+  border-radius: 15px;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.day-btn span {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 0.3rem;
+  color: var(--charcoal-light);
+}
+
+.day-btn strong {
+  font-size: 1.4rem;
+  font-family: var(--font-heading);
+  color: var(--charcoal);
+}
+
+.day-btn.active {
+  background: var(--sage-green);
+  border-color: var(--sage-green);
+}
+
+.day-btn.active span, 
+.day-btn.active strong {
+  color: var(--pure-white);
+}
+
+.time-slots {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.no-selection-msg {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 2rem;
+  background: var(--warm-light);
+  border-radius: 12px;
+  color: var(--charcoal-light);
+  font-style: italic;
+  width: 100%;
+}
+
+.time-slot {
+  padding: 1rem;
+  text-align: center;
+  border-radius: 10px;
+  background: var(--warm-light);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  font-weight: 500;
+}
+
+.time-slot:hover {
+  background: var(--sage-light);
+}
+
+.time-slot.selected {
+  background: var(--charcoal);
+  color: var(--pure-white);
+}
+
+.booking-summary {
+  margin-top: 3rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--warm-sand);
+  text-align: center;
+}
+
+.summary-details {
+  font-size: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+/* ---------------------------------------------------
+   BOOKING FORM
+--------------------------------------------------- */
+.booking-form-container {
+  animation: fadeInUp 0.5s ease forwards;
+}
+
+.form-header {
+  margin-bottom: 2.5rem;
+  text-align: center;
+}
+
+.form-selection-summary {
+  background: var(--warm-light);
+  padding: 1rem;
+  border-radius: 12px;
+  margin-top: 1rem;
+  font-size: 1.1rem;
+}
+
+.form-selection-summary p {
+  margin-bottom: 0.2rem;
+  color: var(--charcoal);
+}
+
+.form-selection-summary strong {
+  color: var(--sage-green);
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+@media (max-width: 768px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-group.full-width {
+  grid-column: 1 / -1;
+}
+
+.form-group label {
+  font-family: var(--font-heading);
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: var(--charcoal);
+}
+
+.form-group input, 
+.form-group select, 
+.form-group textarea {
+  padding: 0.8rem 1rem;
+  border-radius: 10px;
+  border: 1px solid var(--warm-sand);
+  background: var(--white);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  transition: var(--transition-fast);
+}
+
+.form-group input:focus, 
+.form-group select:focus, 
+.form-group textarea:focus {
+  outline: none;
+  border-color: var(--sage-green);
+  box-shadow: 0 0 0 3px rgba(140, 157, 134, 0.1);
+}
+
+.form-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 2.5rem;
+}
+
+.form-actions .btn {
+  flex: 1;
+}
+
+/* ---------------------------------------------------
+   BOOKING SUCCESS
+--------------------------------------------------- */
+.booking-success {
+  text-align: center;
+  padding: 3rem 0;
+  animation: fadeInUp 0.5s ease forwards;
+}
+
+.success-icon {
+  color: var(--sage-green);
+  margin-bottom: 1.5rem;
+}
+
+.success-icon svg {
+  width: 80px;
+  height: 80px;
+}
+
+.booking-success h3 {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+}
+
+.booking-success p {
+  color: var(--charcoal-light);
+  margin-bottom: 2.5rem;
+}

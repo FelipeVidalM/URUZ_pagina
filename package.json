@@ -1,28 +1,33 @@
 {
-  "name": "pagina-uruz",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/FelipeVidalM/URUZ_pagina.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "bugs": {
-    "url": "https://github.com/FelipeVidalM/URUZ_pagina/issues"
-  },
-  "homepage": "https://github.com/FelipeVidalM/URUZ_pagina#readme",
-  "devDependencies": {
-    "vite": "^8.0.3",
-    "vite-plugin-html-inject": "^1.1.2"
-  }
+    "name":  "pagina-uruz",
+    "version":  "1.0.0",
+    "description":  "",
+    "main":  "index.js",
+    "scripts":  {
+                    "dev":  "vite --open",
+                    "build":  "vite build",
+                    "preview":  "vite preview",
+                    "test":  "echo \"Error: no test specified\" \u0026\u0026 exit 1"
+                },
+    "repository":  {
+                       "type":  "git",
+                       "url":  "git+https://github.com/FelipeVidalM/URUZ_pagina.git"
+                   },
+    "keywords":  [
+
+                 ],
+    "author":  "",
+    "license":  "ISC",
+    "type":  "commonjs",
+    "bugs":  {
+                 "url":  "https://github.com/FelipeVidalM/URUZ_pagina/issues"
+             },
+    "homepage":  "https://github.com/FelipeVidalM/URUZ_pagina#readme",
+    "devDependencies":  {
+                            "vite":  "^8.0.3",
+                            "vite-plugin-html-inject":  "^1.1.2"
+                        },
+    "dependencies":  {
+                         "feather-icons":  "^4.29.2"
+                     }
 }
