@@ -11,17 +11,37 @@ exports.handler = async (event) => {
         return { statusCode: 405, body: 'Metodo no permitido' };
     }
 
+    if (!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !process.env.GOOGLE_PRIVATE_KEY || !process.env.GOOGLE_CALENDAR_ID) {
+        return {
+            statusCode: 500,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ error: 'Faltan variables GOOGLE_* en Netlify.' })
+        };
+    }
+
+    let payload;
+    try {
+        payload = JSON.parse(event.body || '{}');
+    } catch (err) {
+        return {
+            statusCode: 400,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ error: 'Body JSON inválido.' })
+        };
+    }
+
     // Datos del formulario de booking.js
-    const { 
-        firstName, 
-        lastName, 
-        email, 
-        phone, 
-        service, 
+    const {
+        firstName,
+        lastName,
+        email,
+        phone,
+        service,
         doctorEmail, // El correo del doctor en Zoho
-        startDateTime, // ISO string
-        endDateTime    // ISO string
-    } = JSON.parse(event.body);
+        notes,
+        startDateTime, // ISO local (YYYY-MM-DDTHH:mm:ss)
+        endDateTime // ISO local (YYYY-MM-DDTHH:mm:ss)
+    } = payload;
 
     if (!firstName || !email || !startDateTime) {
         return { statusCode: 400, body: 'Faltan datos requeridos' };
@@ -40,10 +60,10 @@ exports.handler = async (event) => {
         // 2. Crear Evento en Google
         const calendarEvent = {
             summary: `Cita: ${service} - ${firstName} ${lastName}`,
-            description: `Paciente: ${firstName} ${lastName}\nEmail: ${email}\nTel: ${phone}\nServicio: ${service}`,
+            description: `Paciente: ${firstName} ${lastName}\nEmail: ${email}\nTel: ${phone}\nServicio: ${service}${notes ? `\nNotas: ${notes}` : ''}`,
             start: { dateTime: startDateTime, timeZone: 'America/Bogota' }, // Cambiar según tu zona
             end: { dateTime: endDateTime, timeZone: 'America/Bogota' },
-            attendees: [{ email: email }, { email: doctorEmail }],
+            attendees: [email, doctorEmail].filter(Boolean).map((attendeeEmail) => ({ email: attendeeEmail })),
         };
 
         const resCalendar = await calendar.events.insert({
@@ -51,27 +71,30 @@ exports.handler = async (event) => {
             requestBody: calendarEvent
         });
 
-        // 3. Enviar Emails con Resend
-        const resend = new Resend(process.env.RESEND_API_KEY);
+        // 3. Enviar Emails con Resend (opcional por etapa)
+        if (process.env.RESEND_API_KEY) {
+            const resend = new Resend(process.env.RESEND_API_KEY);
 
-        // Notificación al Paciente
-        await resend.emails.send({
-            from: 'Uruz Bienestar <reservas@tudominio.com>',
-            to: email,
-            subject: 'Confirmación de tu Cita en URUZ',
-            html: `<h1>Hola ${firstName}!</h1><p>Tu cita de <strong>${service}</strong> ha sido confirmada.</p><p>Fecha: ${new Date(startDateTime).toLocaleDateString()}</p>`
-        });
+            await resend.emails.send({
+                from: 'Uruz Bienestar <reservas@tudominio.com>',
+                to: email,
+                subject: 'Confirmación de tu Cita en URUZ',
+                html: `<h1>Hola ${firstName}!</h1><p>Tu cita de <strong>${service}</strong> ha sido confirmada.</p><p>Fecha: ${new Date(startDateTime).toLocaleDateString()}</p>`
+            });
 
-        // Notificación al Doctor (Zoho)
-        await resend.emails.send({
-            from: 'Uruz Booking Bot <reservas@tudominio.com>',
-            to: doctorEmail,
-            subject: 'Nueva Reserva Agendada',
-            html: `<h1>Nueva Cita de ${service}</h1><p>Paciente: ${firstName} ${lastName}</p><p>Email: ${email}</p><p>Teléfono: ${phone}</p>`
-        });
+            if (doctorEmail) {
+                await resend.emails.send({
+                    from: 'Uruz Booking Bot <reservas@tudominio.com>',
+                    to: doctorEmail,
+                    subject: 'Nueva Reserva Agendada',
+                    html: `<h1>Nueva Cita de ${service}</h1><p>Paciente: ${firstName} ${lastName}</p><p>Email: ${email}</p><p>Teléfono: ${phone}</p>`
+                });
+            }
+        }
 
         return {
             statusCode: 200,
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
                 message: 'Reserva exitosa', 
                 eventId: resCalendar.data.id 
@@ -82,7 +105,8 @@ exports.handler = async (event) => {
         console.error('Error in create-booking:', error);
         return {
             statusCode: 500,
-            body: JSON.stringify({ error: 'Error procesando la reserva' })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ error: error.message || 'Error procesando la reserva' })
         };
     }
 };

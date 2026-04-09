@@ -51,12 +51,14 @@ export const setupBooking = (initIcons) => {
 
     const doctorSchedule = {};
     const doctorNames = {};
+    const doctorEmails = {};
     const legacyDoctorMap = {};
 
     doctorsFromConfig.forEach((doctor) => {
         if(!doctor?.id) return;
         doctorSchedule[doctor.id] = doctor.availability || {};
         doctorNames[doctor.id] = doctor.name || doctor.id;
+        doctorEmails[doctor.id] = doctor.email || '';
         (doctor.legacyIds || []).forEach((legacyId) => {
             legacyDoctorMap[legacyId] = doctor.id;
         });
@@ -112,6 +114,30 @@ export const setupBooking = (initIcons) => {
         const h = Math.floor(totalMinutes / 60);
         const m = totalMinutes % 60;
         return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+    };
+
+    const toDateKeyLocal = (date) => {
+        if(!date) return '';
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    };
+
+    const buildLocalDateTime = (date, mins) => {
+        const d = new Date(date);
+        d.setHours(Math.floor(mins / 60), mins % 60, 0, 0);
+        return d;
+    };
+
+    const toCalendarDateTimeString = (date, mins) => {
+        const d = buildLocalDateTime(date, mins);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const h = String(d.getHours()).padStart(2, '0');
+        const min = String(d.getMinutes()).padStart(2, '0');
+        return `${y}-${m}-${day}T${h}:${min}:00`;
     };
 
     const parseTimeToMinutes = (timeStr) => {
@@ -325,8 +351,9 @@ export const setupBooking = (initIcons) => {
             const slots = getAvailableSlotsForDate(selectedDate);
             
             // 2. Consultar disponibilidad real en Google Calendar vía Netlify
-            const dateStr = selectedDate.toISOString().split('T')[0];
+            const dateStr = toDateKeyLocal(selectedDate);
             const response = await fetch(`/.netlify/functions/get-availability?date=${dateStr}`);
+            if(!response.ok) throw new Error('No se pudo consultar disponibilidad');
             const data = await response.json();
             const busySlots = data.busy || [];
 
@@ -346,9 +373,8 @@ export const setupBooking = (initIcons) => {
                 const isBusy = busySlots.some(busy => {
                     const busyStart = new Date(busy.start);
                     const busyEnd = new Date(busy.end);
-                    // Crear fechas comparables (asumiendo misma zona horaria que el server)
-                    const slotStart = new Date(`${dateStr}T${slot.start}:00Z`);
-                    const slotEnd = new Date(`${dateStr}T${slot.end}:00Z`);
+                    const slotStart = buildLocalDateTime(selectedDate, slot.startMins);
+                    const slotEnd = buildLocalDateTime(selectedDate, slot.endMins);
                     return (slotStart < busyEnd && slotEnd > busyStart);
                 });
 
@@ -357,6 +383,7 @@ export const setupBooking = (initIcons) => {
                     div.style.opacity = '0.4';
                     div.style.pointerEvents = 'none';
                     div.style.textDecoration = 'line-through';
+                    div.textContent = 'Reservado';
                 }
 
                 if (selectedTime && selectedTime.start === slot.start) div.classList.add('selected');
@@ -450,8 +477,16 @@ export const setupBooking = (initIcons) => {
     if(btnResetBooking) btnResetBooking.addEventListener('click', resetBooking);
 
     if(bookingPatientForm) {
-        bookingPatientForm.addEventListener('submit', (e) => {
+        bookingPatientForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+
+            if(!selectedDate || !selectedTime) {
+                alert('Primero debes seleccionar fecha y hora.');
+                return;
+            }
+
+            const submitBtn = bookingPatientForm.querySelector('button[type="submit"]');
+            if(submitBtn) submitBtn.disabled = true;
             
             // Gather form data
             const formData = {
@@ -464,18 +499,40 @@ export const setupBooking = (initIcons) => {
                 notes: document.getElementById('p-notes').value,
                 service: selectedService,
                 doctor: selectedDoctorName,
-                date: selectedDate.toISOString().split('T')[0],
+                doctorEmail: doctorEmails[selectedDoctor] || '',
+                date: toDateKeyLocal(selectedDate),
                 day: formatFullDate(selectedDate),
                 time: selectedTime.start,
-                ivType: selectedService === 'suero' ? selectedIvType : null
+                ivType: selectedService === 'suero' ? selectedIvType : null,
+                startDateTime: toCalendarDateTimeString(selectedDate, selectedTime.startMins),
+                endDateTime: toCalendarDateTimeString(selectedDate, selectedTime.endMins)
             };
 
-            console.log("Simulating reservation sending...", formData);
-            
-            // Show Success
-            bookingFormContainer.style.display = 'none';
-            bookingSuccess.style.display = 'block';
-            if (initIcons) initIcons();
+            try {
+                const response = await fetch('/.netlify/functions/create-booking', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+
+                if(!response.ok) {
+                    const errorPayload = await response.json().catch(() => ({}));
+                    throw new Error(errorPayload.error || 'No se pudo completar la reserva');
+                }
+
+                // Show Success
+                bookingFormContainer.style.display = 'none';
+                bookingSuccess.style.display = 'block';
+                if (initIcons) initIcons();
+
+                // Refrescar slots para marcar el recién reservado
+                renderSlots();
+            } catch (error) {
+                console.error('Error creando reserva:', error);
+                alert('No fue posible registrar la reserva. Revisa configuración del servidor y vuelve a intentar.');
+            } finally {
+                if(submitBtn) submitBtn.disabled = false;
+            }
         });
     }
 

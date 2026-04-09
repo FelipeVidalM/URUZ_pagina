@@ -10,9 +10,17 @@ exports.handler = async (event) => {
         return { statusCode: 405, body: 'Metodo no permitido' };
     }
 
-    const { date } = event.queryStringParameters; // Espera formato YYYY-MM-DD
+    const { date } = event.queryStringParameters || {}; // Espera formato YYYY-MM-DD
     if (!date) {
         return { statusCode: 400, body: 'Se requiere la fecha (?date=YYYY-MM-DD)' };
+    }
+
+    if (!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !process.env.GOOGLE_PRIVATE_KEY || !process.env.GOOGLE_CALENDAR_ID) {
+        return {
+            statusCode: 500,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ error: 'Faltan variables GOOGLE_* en Netlify.' })
+        };
     }
 
     try {
@@ -39,7 +47,8 @@ exports.handler = async (event) => {
             }
         });
 
-        const busySlots = response.data.calendars[process.env.GOOGLE_CALENDAR_ID].busy;
+        const calendarData = response.data.calendars?.[process.env.GOOGLE_CALENDAR_ID];
+        const busySlots = calendarData?.busy || [];
 
         return {
             statusCode: 200,
