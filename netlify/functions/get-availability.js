@@ -1,5 +1,18 @@
 const { google } = require('googleapis');
 
+const normalizePrivateKey = (rawKey) => {
+    if (!rawKey) return '';
+    let key = rawKey.trim();
+
+    // Allow keys pasted with surrounding quotes in Netlify env vars.
+    if ((key.startsWith('"') && key.endsWith('"')) || (key.startsWith("'") && key.endsWith("'"))) {
+        key = key.slice(1, -1);
+    }
+
+    // Support escaped newlines from .env style values.
+    return key.replace(/\\n/g, '\n');
+};
+
 /**
  * Netlify Function: get-availability
  * Consulta Google Calendar para obtener los bloques ocupados en un rango de fechas.
@@ -24,11 +37,13 @@ exports.handler = async (event) => {
     }
 
     try {
+        const privateKey = normalizePrivateKey(process.env.GOOGLE_PRIVATE_KEY);
+
         // 1. Configurar Auth con Google
         const auth = new google.auth.JWT(
             process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
             null,
-            process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'), // Corregir saltos de línea
+            privateKey,
             ['https://www.googleapis.com/auth/calendar.readonly']
         );
 
@@ -60,7 +75,8 @@ exports.handler = async (event) => {
         console.error('Error in get-availability:', error);
         return {
             statusCode: 500,
-            body: JSON.stringify({ error: 'Error consultando calendario' })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ error: `Error consultando calendario: ${error.message || 'desconocido'}` })
         };
     }
 };

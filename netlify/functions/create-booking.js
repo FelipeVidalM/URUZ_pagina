@@ -1,6 +1,17 @@
 const { google } = require('googleapis');
 const { Resend } = require('resend');
 
+const normalizePrivateKey = (rawKey) => {
+    if (!rawKey) return '';
+    let key = rawKey.trim();
+
+    if ((key.startsWith('"') && key.endsWith('"')) || (key.startsWith("'") && key.endsWith("'"))) {
+        key = key.slice(1, -1);
+    }
+
+    return key.replace(/\\n/g, '\n');
+};
+
 /**
  * Netlify Function: create-booking
  * Crea reserva en Google Calendar y notifica vía Resend (Paciente + Dr en Zoho).
@@ -48,11 +59,13 @@ exports.handler = async (event) => {
     }
 
     try {
+        const privateKey = normalizePrivateKey(process.env.GOOGLE_PRIVATE_KEY);
+
         // 1. Auth Google
         const auth = new google.auth.JWT(
             process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
             null,
-            process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+            privateKey,
             ['https://www.googleapis.com/auth/calendar']
         );
         const calendar = google.calendar({ version: 'v3', auth });
