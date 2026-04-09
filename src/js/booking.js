@@ -2,6 +2,8 @@
  * Booking Logic for URUZ Website
  */
 
+import bookingConfig from '../data/booking-schedule.json';
+
 export const setupBooking = (initIcons) => {
     const timeSlotsContainer = document.getElementById('time-slots-container');
     const daysSelector = document.getElementById('days-selector');
@@ -11,7 +13,7 @@ export const setupBooking = (initIcons) => {
     const svcBtns = document.querySelectorAll('.svc-btn');
     const ivBtns = document.querySelectorAll('.iv-btn');
     const ivTypeSelector = document.getElementById('iv-type-selector');
-    const docBtns = document.querySelectorAll('.doc-btn');
+    const docTypesContainer = document.getElementById('doc-types-container');
     const doctorSelector = document.getElementById('doctor-selector');
     const bookingSummary = document.getElementById('booking-summary');
     const summaryDay = document.getElementById('summary-day');
@@ -34,25 +36,51 @@ export const setupBooking = (initIcons) => {
 
     if (!timeSlotsContainer) return;
 
+    const doctorsFromConfig = Array.isArray(bookingConfig?.doctors) ? bookingConfig.doctors : [];
+    const anyDoctorConfig = bookingConfig?.anyDoctor || { id: 'any', name: 'Cualquier Profesional', summaryName: 'Especialista URUZ' };
+    const anyDoctorId = anyDoctorConfig.id || 'any';
+    const anyDoctorLabel = anyDoctorConfig.name || 'Cualquier Profesional';
+    const anyDoctorSummaryName = anyDoctorConfig.summaryName || 'Especialista URUZ';
+
+    const consultaServiceConfig = bookingConfig?.services?.consulta || { slotDuration: 45 };
+    const sueroServiceConfig = bookingConfig?.services?.suero || { slotDuration: 60, excludeWeekdays: [0] };
+    const consultaDuration = Number(consultaServiceConfig.slotDuration) || 45;
+    const sueroDuration = Number(sueroServiceConfig.slotDuration) || 60;
+    const sueroExcludedWeekdays = Array.isArray(sueroServiceConfig.excludeWeekdays) ? sueroServiceConfig.excludeWeekdays : [0];
+    const sueroAvailability = sueroServiceConfig?.availability || {};
+
+    const doctorSchedule = {};
+    const doctorNames = {};
+    const legacyDoctorMap = {};
+
+    doctorsFromConfig.forEach((doctor) => {
+        if(!doctor?.id) return;
+        doctorSchedule[doctor.id] = doctor.availability || {};
+        doctorNames[doctor.id] = doctor.name || doctor.id;
+        (doctor.legacyIds || []).forEach((legacyId) => {
+            legacyDoctorMap[legacyId] = doctor.id;
+        });
+    });
+
+    doctorNames[anyDoctorId] = anyDoctorSummaryName;
+
+    const configuredDoctorIds = doctorsFromConfig
+        .map((doctor) => doctor.id)
+        .filter(Boolean);
+
+    const defaultDoctorId = configuredDoctorIds[0] || anyDoctorId;
+
     // State
     let selectedService = 'consulta';
     let selectedIvType = 'Vitalidad';
-    let selectedDoctor = 'silva';
-    let selectedDoctorName = "Dr. Alejandro Silva";
+    let selectedDoctor = defaultDoctorId;
+    let selectedDoctorName = doctorNames[defaultDoctorId] || 'Especialista';
     let selectedDate = null; // Full date object
     let selectedTime = null;
-    let slotDuration = 45;
+    let slotDuration = consultaDuration;
     let calendarMonthDate = new Date(); // Tracks current view month
     calendarMonthDate.setDate(1);
     calendarMonthDate.setHours(0,0,0,0);
-
-    const doctorAvailability = {
-        silva: ['Lunes', 'Miércoles', 'Viernes'],
-        mazo: ['Martes', 'Jueves', 'Sábado'],
-        ruiz: ['Lunes', 'Martes', 'Miércoles'],
-        vargas: ['Jueves', 'Viernes', 'Sábado'],
-        any: ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
-    };
 
     const getDayName = (date) => {
         const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
@@ -86,6 +114,11 @@ export const setupBooking = (initIcons) => {
         return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
     };
 
+    const parseTimeToMinutes = (timeStr) => {
+        const [h, m] = timeStr.split(':').map(Number);
+        return (h * 60) + m;
+    };
+
     const generateSlots = () => {
         const startMinutes = 8 * 60;
         const endMinutes = 21 * 60;
@@ -96,13 +129,99 @@ export const setupBooking = (initIcons) => {
         return slots;
     };
 
+    const getDoctorDaySchedule = (doctorId, dayOfWeek) => {
+        return doctorSchedule[doctorId]?.[dayOfWeek] || [];
+    };
+
+    const mapStartTimesToSlots = (startTimes, duration) => {
+        return startTimes
+            .slice()
+            .sort((a, b) => parseTimeToMinutes(a) - parseTimeToMinutes(b))
+            .map((start) => {
+                const startMins = parseTimeToMinutes(start);
+                return {
+                    start,
+                    end: formatTime(startMins + duration),
+                    startMins,
+                    endMins: startMins + duration
+                };
+            });
+    };
+
+    const getSueroDaySchedule = (dayOfWeek) => {
+        return sueroAvailability?.[dayOfWeek] || [];
+    };
+
+    const renderDoctorButtons = () => {
+        if(!docTypesContainer) return;
+        docTypesContainer.innerHTML = '';
+
+        doctorsFromConfig.forEach((doctor) => {
+            const btn = document.createElement('button');
+            btn.className = 'doc-btn';
+            btn.setAttribute('data-doc', doctor.id);
+            btn.textContent = doctor.name || doctor.id;
+            if(doctor.id === selectedDoctor) btn.classList.add('active');
+            docTypesContainer.appendChild(btn);
+        });
+
+        const anyBtn = document.createElement('button');
+        anyBtn.className = 'doc-btn';
+        anyBtn.setAttribute('data-doc', anyDoctorId);
+        anyBtn.textContent = anyDoctorLabel;
+        if(selectedDoctor === anyDoctorId) anyBtn.classList.add('active');
+        docTypesContainer.appendChild(anyBtn);
+    };
+
+    const setActiveDoctorButton = (doctorId) => {
+        if(!docTypesContainer) return;
+        docTypesContainer.querySelectorAll('.doc-btn').forEach((btn) => {
+            btn.classList.toggle('active', btn.getAttribute('data-doc') === doctorId);
+        });
+    };
+
+    const getAvailableSlotsForDate = (date) => {
+        if(!date) return [];
+
+        const dayOfWeek = date.getDay();
+
+        if(selectedService === 'suero') {
+            if(sueroExcludedWeekdays.includes(dayOfWeek)) return [];
+
+            const configuredSueroTimes = getSueroDaySchedule(dayOfWeek);
+            if(Array.isArray(configuredSueroTimes) && configuredSueroTimes.length > 0) {
+                return mapStartTimesToSlots(configuredSueroTimes, sueroDuration);
+            }
+
+            if(Object.keys(sueroAvailability).length > 0) {
+                return [];
+            }
+
+            return generateSlots();
+        }
+
+        if(dayOfWeek === 0 || dayOfWeek === 6) return [];
+
+        let startTimes = [];
+        if(selectedDoctor === anyDoctorId) {
+            const merged = new Set();
+            Object.keys(doctorSchedule).forEach((doctorId) => {
+                getDoctorDaySchedule(doctorId, dayOfWeek).forEach((t) => merged.add(t));
+            });
+            startTimes = Array.from(merged);
+        } else {
+            startTimes = getDoctorDaySchedule(selectedDoctor, dayOfWeek);
+        }
+
+        return mapStartTimesToSlots(startTimes, consultaDuration);
+    };
+
     const isDayAllowed = (date) => {
         const today = new Date();
         today.setHours(0,0,0,0);
         if(date < today) return false; // No past dates
-        if(selectedService === 'suero') return date.getDay() !== 0; // No Sundays for IV
-        const dayName = getDayName(date);
-        return doctorAvailability[selectedDoctor].includes(dayName);
+        if(selectedService === 'suero') return getAvailableSlotsForDate(date).length > 0;
+        return getAvailableSlotsForDate(date).length > 0;
     };
 
     const renderDays = () => {
@@ -200,7 +319,11 @@ export const setupBooking = (initIcons) => {
             timeSlotsContainer.innerHTML = '<div class="no-selection-msg">Selecciona un día para ver disponibilidad.</div>';
             return;
         }
-        const slots = generateSlots();
+        const slots = getAvailableSlotsForDate(selectedDate);
+        if(slots.length === 0) {
+            timeSlotsContainer.innerHTML = '<div class="no-selection-msg">No hay horarios disponibles para este día.</div>';
+            return;
+        }
         slots.forEach(slot => {
             const div = document.createElement('div');
             div.className = 'time-slot';
@@ -327,11 +450,11 @@ export const setupBooking = (initIcons) => {
             if(selectedService === 'suero') {
                 if(ivTypeSelector) ivTypeSelector.style.display = 'block';
                 if(doctorSelector) doctorSelector.style.display = 'none';
-                slotDuration = 60;
+                slotDuration = sueroDuration;
             } else {
                 if(ivTypeSelector) ivTypeSelector.style.display = 'none';
                 if(doctorSelector) doctorSelector.style.display = 'block';
-                slotDuration = 45;
+                slotDuration = consultaDuration;
             }
 
             // Keep the selected day only if it is still allowed for the new service.
@@ -351,13 +474,14 @@ export const setupBooking = (initIcons) => {
         });
     });
 
-    docBtns.forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            docBtns.forEach(b => b.classList.remove('active'));
-            e.currentTarget.classList.add('active');
-            selectedDoctor = e.currentTarget.getAttribute('data-doc');
-            const names = { silva: "Dr. Alejandro Silva", mazo: "Dra. Carolina Mazo", ruiz: "Dr. Javier Ruiz", vargas: "Lic. Sofía Vargas", any: "Especialista URUZ" };
-            selectedDoctorName = names[selectedDoctor] || "Especialista";
+    if(docTypesContainer) {
+        docTypesContainer.addEventListener('click', (e) => {
+            const targetBtn = e.target.closest('.doc-btn');
+            if(!targetBtn) return;
+
+            selectedDoctor = targetBtn.getAttribute('data-doc') || defaultDoctorId;
+            selectedDoctorName = doctorNames[selectedDoctor] || 'Especialista';
+            setActiveDoctorButton(selectedDoctor);
 
             // Keep current date/time selection if still valid for the chosen doctor.
             if(selectedDate && !isDayAllowed(selectedDate)) {
@@ -365,11 +489,17 @@ export const setupBooking = (initIcons) => {
                 selectedTime = null;
             }
 
+            if(selectedDate && selectedTime) {
+                const stillAvailable = getAvailableSlotsForDate(selectedDate)
+                    .some((slot) => slot.start === selectedTime.start);
+                if(!stillAvailable) selectedTime = null;
+            }
+
             renderDays();
             renderSlots();
             updateSummary();
         });
-    });
+    }
 
     ivBtns.forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -384,8 +514,10 @@ export const setupBooking = (initIcons) => {
     window.selectDoctor = (docId) => {
         const consultaBtn = document.querySelector('.svc-btn[data-svc="consulta"]');
         if(consultaBtn) consultaBtn.click();
+
+        const normalizedDocId = legacyDoctorMap[docId] || docId;
         
-        const specificDocBtn = document.querySelector(`.doc-btn[data-doc="${docId}"]`);
+        const specificDocBtn = document.querySelector(`.doc-btn[data-doc="${normalizedDocId}"]`);
         if(specificDocBtn) specificDocBtn.click();
         
         const bookingSection = document.getElementById('booking');
@@ -395,6 +527,7 @@ export const setupBooking = (initIcons) => {
     };
 
     // Initial Render
+    renderDoctorButtons();
     renderDays();
     renderSlots();
 };
