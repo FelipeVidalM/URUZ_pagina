@@ -313,30 +313,69 @@ export const setupBooking = (initIcons) => {
         });
     }
 
-    const renderSlots = () => {
-        timeSlotsContainer.innerHTML = '';
+    const renderSlots = async () => {
+        timeSlotsContainer.innerHTML = '<div class="no-selection-msg">Consultando disponibilidad...</div>';
         if(!selectedDate) {
             timeSlotsContainer.innerHTML = '<div class="no-selection-msg">Selecciona un día para ver disponibilidad.</div>';
             return;
         }
-        const slots = getAvailableSlotsForDate(selectedDate);
-        if(slots.length === 0) {
-            timeSlotsContainer.innerHTML = '<div class="no-selection-msg">No hay horarios disponibles para este día.</div>';
-            return;
-        }
-        slots.forEach(slot => {
-            const div = document.createElement('div');
-            div.className = 'time-slot';
-            div.textContent = slot.start;
-            if(selectedTime && selectedTime.start === slot.start) div.classList.add('selected');
-            div.addEventListener('click', () => {
-                document.querySelectorAll('.time-slot').forEach(el => el.classList.remove('selected'));
-                div.classList.add('selected');
-                selectedTime = slot;
-                updateSummary();
+
+        try {
+            // 1. Obtener slots base según configuración local
+            const slots = getAvailableSlotsForDate(selectedDate);
+            
+            // 2. Consultar disponibilidad real en Google Calendar vía Netlify
+            const dateStr = selectedDate.toISOString().split('T')[0];
+            const response = await fetch(`/.netlify/functions/get-availability?date=${dateStr}`);
+            const data = await response.json();
+            const busySlots = data.busy || [];
+
+            timeSlotsContainer.innerHTML = '';
+
+            if (slots.length === 0) {
+                timeSlotsContainer.innerHTML = '<div class="no-selection-msg">No hay horarios disponibles para este día.</div>';
+                return;
+            }
+
+            slots.forEach(slot => {
+                const div = document.createElement('div');
+                div.className = 'time-slot';
+                div.textContent = slot.start;
+
+                // Verificar si el slot está ocupado en Google
+                const isBusy = busySlots.some(busy => {
+                    const busyStart = new Date(busy.start);
+                    const busyEnd = new Date(busy.end);
+                    // Crear fechas comparables (asumiendo misma zona horaria que el server)
+                    const slotStart = new Date(`${dateStr}T${slot.start}:00Z`);
+                    const slotEnd = new Date(`${dateStr}T${slot.end}:00Z`);
+                    return (slotStart < busyEnd && slotEnd > busyStart);
+                });
+
+                if (isBusy) {
+                    div.classList.add('disabled');
+                    div.style.opacity = '0.4';
+                    div.style.pointerEvents = 'none';
+                    div.style.textDecoration = 'line-through';
+                }
+
+                if (selectedTime && selectedTime.start === slot.start) div.classList.add('selected');
+                
+                if (!isBusy) {
+                    div.addEventListener('click', () => {
+                        document.querySelectorAll('.time-slot').forEach(el => el.classList.remove('selected'));
+                        div.classList.add('selected');
+                        selectedTime = slot;
+                        updateSummary();
+                    });
+                }
+                
+                timeSlotsContainer.appendChild(div);
             });
-            timeSlotsContainer.appendChild(div);
-        });
+        } catch (error) {
+            console.error("Error cargando disponibilidad:", error);
+            timeSlotsContainer.innerHTML = '<div class="no-selection-msg error">Error al conectar con el servidor.</div>';
+        }
     };
 
     const updateSummary = () => {
