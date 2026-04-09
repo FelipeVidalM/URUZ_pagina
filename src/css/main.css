@@ -277,12 +277,10 @@ img {
 }
 
 .days-selector {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 0.8rem;
-  overflow-x: auto;
   padding: 0.5rem 0 1.5rem;
-  scrollbar-width: thin;
-  scrollbar-color: var(--sage-light) transparent;
 }
 
 .day-btn.disabled {
@@ -296,26 +294,30 @@ img {
   color: var(--charcoal-light);
 }
 
-.days-selector::-webkit-scrollbar {
-  height: 6px;
-}
-
-.days-selector::-webkit-scrollbar-thumb {
-  background: var(--sage-light);
-  border-radius: 10px;
-}
-
 .day-btn {
   display: flex;
   flex-direction: column;
   align-items: center;
-  min-width: 80px;
+  width: 100%;
+  min-width: 0;
   padding: 1rem 0.5rem;
   background: var(--white);
   border: 1px solid var(--warm-sand);
   border-radius: 15px;
   cursor: pointer;
   transition: var(--transition-fast);
+}
+
+@media (max-width: 980px) {
+  .days-selector {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .days-selector {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .day-btn span {

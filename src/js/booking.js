@@ -6,8 +6,8 @@ export const setupBooking = (initIcons) => {
     const timeSlotsContainer = document.getElementById('time-slots-container');
     const daysSelector = document.getElementById('days-selector');
     const currentMonthDisplay = document.getElementById('current-month-display');
-    const btnPrevWeek = document.getElementById('btn-prev-week');
-    const btnNextWeek = document.getElementById('btn-next-week');
+    const btnPrevMonth = document.getElementById('btn-prev-week');
+    const btnNextMonth = document.getElementById('btn-next-week');
     const svcBtns = document.querySelectorAll('.svc-btn');
     const ivBtns = document.querySelectorAll('.iv-btn');
     const ivTypeSelector = document.getElementById('iv-type-selector');
@@ -42,8 +42,9 @@ export const setupBooking = (initIcons) => {
     let selectedDate = null; // Full date object
     let selectedTime = null;
     let slotDuration = 45;
-    let calendarStartDate = new Date(); // Tracks current view start
-    calendarStartDate.setHours(0,0,0,0);
+    let calendarMonthDate = new Date(); // Tracks current view month
+    calendarMonthDate.setDate(1);
+    calendarMonthDate.setHours(0,0,0,0);
 
     const doctorAvailability = {
         silva: ['Lunes', 'Miércoles', 'Viernes'],
@@ -66,6 +67,17 @@ export const setupBooking = (initIcons) => {
     const formatFullDate = (date) => {
         const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
         return `${getDayName(date)}, ${date.getDate()} de ${months[date.getMonth()]}`;
+    };
+
+    const getWeekdayIndexMondayFirst = (date) => {
+        return (date.getDay() + 6) % 7;
+    };
+
+    const getStartOfMonth = (date) => {
+        const d = new Date(date);
+        d.setDate(1);
+        d.setHours(0,0,0,0);
+        return d;
     };
 
     const formatTime = (totalMinutes) => {
@@ -95,20 +107,39 @@ export const setupBooking = (initIcons) => {
 
     const renderDays = () => {
         daysSelector.innerHTML = '';
-        currentMonthDisplay.textContent = formatMonthYear(calendarStartDate);
+        currentMonthDisplay.textContent = formatMonthYear(calendarMonthDate);
 
         const today = new Date();
         today.setHours(0,0,0,0);
+        const currentMonthStart = getStartOfMonth(calendarMonthDate);
+        const todayMonthStart = getStartOfMonth(today);
         
-        // Disable Prev button if we are at today's week
-        if(btnPrevWeek) btnPrevWeek.disabled = (calendarStartDate <= today);
+        // Disable Prev button if we are at today's month
+        if(btnPrevMonth) btnPrevMonth.disabled = (currentMonthStart <= todayMonthStart);
 
-        let daysAdded = 0;
-        let currentIterDate = new Date(calendarStartDate);
+        const year = calendarMonthDate.getFullYear();
+        const month = calendarMonthDate.getMonth();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const weekdayHeaders = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
-        // Show 7 days range from calendarStartDate
-        for(let i = 0; i < 7; i++) {
-            const date = new Date(currentIterDate);
+        weekdayHeaders.forEach((label) => {
+            const headerCell = document.createElement('div');
+            headerCell.className = 'weekday-header';
+            headerCell.textContent = label;
+            daysSelector.appendChild(headerCell);
+        });
+
+        const firstDayOfMonth = new Date(year, month, 1);
+        const leadingEmptyCells = getWeekdayIndexMondayFirst(firstDayOfMonth);
+
+        for(let i = 0; i < leadingEmptyCells; i++) {
+            const emptyCell = document.createElement('div');
+            emptyCell.className = 'day-cell-empty';
+            daysSelector.appendChild(emptyCell);
+        }
+
+        for(let dayNumber = 1; dayNumber <= daysInMonth; dayNumber++) {
+            const date = new Date(year, month, dayNumber);
             const btn = document.createElement('button');
             btn.className = 'day-btn';
             
@@ -120,7 +151,7 @@ export const setupBooking = (initIcons) => {
 
             if(selectedDate && selectedDate.toDateString() === date.toDateString()) btn.classList.add('active');
             
-            btn.innerHTML = `<span>${getDayName(date).substring(0,3)}</span><strong>${date.getDate()}</strong>`;
+            btn.innerHTML = `<strong class="day-number">${date.getDate()}</strong>`;
             
             if(allowed) {
                 btn.addEventListener('click', () => {
@@ -134,28 +165,30 @@ export const setupBooking = (initIcons) => {
             }
 
             daysSelector.appendChild(btn);
-            currentIterDate.setDate(currentIterDate.getDate() + 1);
         }
     };
 
     // Navigation logic
-    if(btnNextWeek) {
-        btnNextWeek.addEventListener('click', () => {
-            calendarStartDate.setDate(calendarStartDate.getDate() + 7);
+    if(btnNextMonth) {
+        btnNextMonth.addEventListener('click', () => {
+            calendarMonthDate.setMonth(calendarMonthDate.getMonth() + 1);
+            calendarMonthDate.setDate(1);
             renderDays();
         });
     }
 
-    if(btnPrevWeek) {
-        btnPrevWeek.addEventListener('click', () => {
+    if(btnPrevMonth) {
+        btnPrevMonth.addEventListener('click', () => {
             const today = new Date();
-            today.setHours(0,0,0,0);
-            const newStart = new Date(calendarStartDate);
-            newStart.setDate(newStart.getDate() - 7);
-            if(newStart >= today) {
-                calendarStartDate = newStart;
+            const todayMonthStart = getStartOfMonth(today);
+            const newMonth = new Date(calendarMonthDate);
+            newMonth.setMonth(newMonth.getMonth() - 1);
+            newMonth.setDate(1);
+            newMonth.setHours(0,0,0,0);
+            if(newMonth >= todayMonthStart) {
+                calendarMonthDate = newMonth;
             } else {
-                calendarStartDate = today;
+                calendarMonthDate = todayMonthStart;
             }
             renderDays();
         });
@@ -242,8 +275,7 @@ export const setupBooking = (initIcons) => {
         bookingSuccess.style.display = 'none';
         selectedTime = null;
         selectedDate = null;
-        calendarStartDate = new Date();
-        calendarStartDate.setHours(0,0,0,0);
+        calendarMonthDate = getStartOfMonth(new Date());
         bookingPatientForm.reset();
         hideForm();
         renderDays();
@@ -288,6 +320,7 @@ export const setupBooking = (initIcons) => {
     // Event Listeners
     svcBtns.forEach(btn => {
         btn.addEventListener('click', (e) => {
+            const previousService = selectedService;
             svcBtns.forEach(b => b.classList.remove('active'));
             e.currentTarget.classList.add('active');
             selectedService = e.currentTarget.getAttribute('data-svc');
@@ -300,10 +333,18 @@ export const setupBooking = (initIcons) => {
                 if(doctorSelector) doctorSelector.style.display = 'block';
                 slotDuration = 45;
             }
-            selectedTime = null;
-            selectedDate = null; 
-            calendarStartDate = new Date();
-            calendarStartDate.setHours(0,0,0,0);
+
+            // Keep the selected day only if it is still allowed for the new service.
+            if(selectedDate && !isDayAllowed(selectedDate)) {
+                selectedDate = null;
+                selectedTime = null;
+            }
+
+            // Service switch changes slot duration (45/60), so reset time selection only when service changes.
+            if(previousService !== selectedService) {
+                selectedTime = null;
+            }
+
             renderDays();
             renderSlots();
             updateSummary();
@@ -317,10 +358,13 @@ export const setupBooking = (initIcons) => {
             selectedDoctor = e.currentTarget.getAttribute('data-doc');
             const names = { silva: "Dr. Alejandro Silva", mazo: "Dra. Carolina Mazo", ruiz: "Dr. Javier Ruiz", vargas: "Lic. Sofía Vargas", any: "Especialista URUZ" };
             selectedDoctorName = names[selectedDoctor] || "Especialista";
-            selectedDate = null;
-            selectedTime = null;
-            calendarStartDate = new Date();
-            calendarStartDate.setHours(0,0,0,0);
+
+            // Keep current date/time selection if still valid for the chosen doctor.
+            if(selectedDate && !isDayAllowed(selectedDate)) {
+                selectedDate = null;
+                selectedTime = null;
+            }
+
             renderDays();
             renderSlots();
             updateSummary();

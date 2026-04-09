@@ -645,28 +645,67 @@
 }
 
 .days-selector {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 0.5rem;
   margin-bottom: 2rem;
-  justify-content: center;
+}
+
+.weekday-header {
+  text-align: center;
+  font-family: var(--font-heading);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--charcoal-light);
+  padding: 0.35rem 0;
+}
+
+.day-cell-empty {
+  min-height: 74px;
 }
 
 .day-btn {
-  padding: 0.5rem 1rem;
-  border-radius: 20px;
+  min-height: 74px;
+  width: 100%;
+  padding: 0.75rem 0.5rem;
+  border-radius: 14px;
   border: 1px solid var(--sage-light);
-  background: transparent;
+  background: var(--pure-white);
   color: var(--charcoal);
   font-family: var(--font-heading);
   cursor: pointer;
   transition: var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.day-btn .day-number {
+  font-size: 1.25rem;
+  font-weight: 600;
 }
 
 .day-btn.active, .day-btn:hover {
   background: var(--sage-green);
   color: var(--pure-white);
   border-color: var(--sage-green);
+}
+
+@media (max-width: 900px) {
+  .days-selector {
+    grid-template-columns: repeat(7, minmax(38px, 1fr));
+    gap: 0.4rem;
+  }
+
+  .day-btn {
+    min-height: 64px;
+    border-radius: 12px;
+  }
+
+  .day-cell-empty {
+    min-height: 64px;
+  }
 }
 
 .time-slots {
