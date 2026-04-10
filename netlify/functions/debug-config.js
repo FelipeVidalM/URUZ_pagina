@@ -1,4 +1,5 @@
 const { google } = require('googleapis');
+const { GoogleAuth } = require('google-auth-library');
 
 /**
  * FUNCION TEMPORAL DE DIAGNOSTICO - BORRAR DESPUES DE RESOLVER EL PROBLEMA
@@ -41,13 +42,14 @@ exports.handler = async () => {
         ? `OK - tiene cabecera PEM (primeros chars: "${key.slice(0, 40).replace(/\n/g, '\\n')}")`
         : `ERROR - no contiene "BEGIN PRIVATE KEY". El valor podria estar mal pegado.`;
 
-    // Test de autenticacion JWT con Google
+    // Test de autenticacion con Google
     try {
-        const auth = new google.auth.JWT(email, null, key, [
-            'https://www.googleapis.com/auth/calendar.readonly',
-        ]);
+        const auth = new GoogleAuth({
+            credentials: { client_email: email, private_key: key },
+            scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
+        });
         const token = await auth.getAccessToken();
-        report.authTest = token?.token ? 'OK - Token obtenido correctamente' : 'FALLO - Token vacío';
+        report.authTest = token ? 'OK - Token obtenido correctamente' : 'FALLO - Token vacío';
     } catch (err) {
         report.authTest = `ERROR: ${err.message}`;
     }
@@ -55,9 +57,10 @@ exports.handler = async () => {
     // Test de acceso al calendario
     if (report.authTest?.startsWith('OK')) {
         try {
-            const auth = new google.auth.JWT(email, null, key, [
-                'https://www.googleapis.com/auth/calendar.readonly',
-            ]);
+            const auth = new GoogleAuth({
+                credentials: { client_email: email, private_key: key },
+                scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
+            });
             const calendar = google.calendar({ version: 'v3', auth });
             const now = new Date().toISOString();
             const tomorrow = new Date(Date.now() + 86400000).toISOString();

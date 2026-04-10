@@ -1,14 +1,13 @@
 const { google } = require('googleapis');
 const { Resend } = require('resend');
+const { GoogleAuth } = require('google-auth-library');
 
 const normalizePrivateKey = (rawKey) => {
     if (!rawKey) return '';
     let key = rawKey.trim();
-
     if ((key.startsWith('"') && key.endsWith('"')) || (key.startsWith("'") && key.endsWith("'"))) {
         key = key.slice(1, -1);
     }
-
     return key.replace(/\\n/g, '\n');
 };
 
@@ -61,13 +60,14 @@ exports.handler = async (event) => {
     try {
         const privateKey = normalizePrivateKey(process.env.GOOGLE_PRIVATE_KEY);
 
-        // 1. Auth Google
-        const auth = new google.auth.JWT(
-            process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-            null,
-            privateKey,
-            ['https://www.googleapis.com/auth/calendar']
-        );
+        // 1. Auth Google (GoogleAuth es la forma correcta en googleapis v100+)
+        const auth = new GoogleAuth({
+            credentials: {
+                client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+                private_key: privateKey,
+            },
+            scopes: ['https://www.googleapis.com/auth/calendar'],
+        });
         const calendar = google.calendar({ version: 'v3', auth });
 
         // 2. Crear Evento en Google

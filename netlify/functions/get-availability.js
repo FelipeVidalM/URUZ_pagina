@@ -1,15 +1,12 @@
 const { google } = require('googleapis');
+const { GoogleAuth } = require('google-auth-library');
 
 const normalizePrivateKey = (rawKey) => {
     if (!rawKey) return '';
     let key = rawKey.trim();
-
-    // Allow keys pasted with surrounding quotes in Netlify env vars.
     if ((key.startsWith('"') && key.endsWith('"')) || (key.startsWith("'") && key.endsWith("'"))) {
         key = key.slice(1, -1);
     }
-
-    // Support escaped newlines from .env style values.
     return key.replace(/\\n/g, '\n');
 };
 
@@ -39,13 +36,14 @@ exports.handler = async (event) => {
     try {
         const privateKey = normalizePrivateKey(process.env.GOOGLE_PRIVATE_KEY);
 
-        // 1. Configurar Auth con Google
-        const auth = new google.auth.JWT(
-            process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-            null,
-            privateKey,
-            ['https://www.googleapis.com/auth/calendar.readonly']
-        );
+        // 1. Configurar Auth con Google (GoogleAuth es la forma correcta en googleapis v100+)
+        const auth = new GoogleAuth({
+            credentials: {
+                client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+                private_key: privateKey,
+            },
+            scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
+        });
 
         const calendar = google.calendar({ version: 'v3', auth });
         
